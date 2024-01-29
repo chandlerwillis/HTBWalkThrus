@@ -1,0 +1,41 @@
+HackTheBox Exploitations
+
+Box: Sizzle
+Difficulty: Insane
+Type: Windows
+
+https://0xrick.github.io/hack-the-box/sizzle/
+
+Recon phase:
+
+–> NMAP (ports open 21, 53, 80, 135, 139, 389, 443, 445, 464, 593, 636, 3268, 3269 open)
+–> GoBuster (finds “certserv”)
+–> SMB share check (smbclient) 
+–> smbclient –list //sizzle.htb/ -U “”
+
+SMB contains share for Active Directory Certificate Service (hosted at http://sizzle.htb/certserv)
+→ “Department Shares” SMB is writable in 2 directories, ZZ_ARCHIVE and Users/Public
+→ Since writable by unauthenticated users, vulnerable to SCF attacks. 
+—--> https://pentestlab.blog/2017/12/13/smb-share-scf-file-attacks/
+
+→ use responder to capture hash, crack with johntheripper
+→ get password
+→ try accessing “certenroll” SMB so we can generate a certificate. This cert will be used for WinRM (Windows Remote management)
+
+→ “smbclient //sizzle.htb/certenroll -U amanda”
+→ contains certificate information for the share
+→ accessing sizzle.htb/certserv allows
+
+Another NMAP scan shows that wsman and wsmans port are open. Which is for WinRM. Each running HTTPAPI.
+
+To connect to HTTP, we need to create a key and certificate. 
+
+openssl req -newkey rsa:2048 -nodes -keyout request.key -out request.csr
+
+Go back to /certserv, submit advanced cert request, access base64 encoded cert
+
+WinRM shell: https://github.com/Alamot/code-snippets/blob/master/winrm/winrm_shell.rb
+
+No winRM on Linux, so must use Ruby library for it. Which is in the link above. 
+
+-- Enumerate file system
